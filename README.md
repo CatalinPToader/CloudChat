@@ -1,1 +1,2 @@
 # CloudChat
+Requires docker
