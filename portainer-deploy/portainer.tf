@@ -37,6 +37,11 @@ resource "kubernetes_deployment" "portainer_deployment" {
           port {
             container_port = 9000
           }
+          command = [
+            "/portainer",
+            "--admin-password",
+            "$2y$05$w5wsvlEDXxPjh2GGfkoe9.At0zj8r7DeafAkXXeubs0JnmxLjyw/a",
+          ]
         }
       }
     }
@@ -91,5 +96,16 @@ resource "kubernetes_cluster_role_binding" "portainer_cluster_role_binding" {
     kind     = "ClusterRole"
     name     = kubernetes_cluster_role.portainer_cluster_role.metadata[0].name
     api_group = "rbac.authorization.k8s.io"
+  }
+}
+
+resource "kubernetes_secret" "portainer_admin_password_secret" {
+  metadata {
+    name      = "portainer-admin-password"
+    namespace = kubernetes_namespace.portainer_namespace.metadata[0].name
+  }
+
+  data = {
+    "portainer_admin_password" = file("./passwd.txt")
   }
 }
