@@ -1,5 +1,7 @@
 #!/bin/bash
 
+
+docker build -t cloudchat/backend -f backend-go/backend_dockerfile ./backend-go/
 kind create cluster --config kind-config.yaml --name goodcluster
 kind get kubeconfig --name goodcluster > mykubeconfig
 terraform init

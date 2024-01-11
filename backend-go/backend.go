@@ -89,26 +89,22 @@ func main() {
 
 	ws := new(restful.WebService)
 
-	ws.Path("/channel")
-
-	ws.Route(ws.GET("/{channelName}").
+	ws.Route(ws.GET("/channel/{channelName}").
 		Produces(restful.MIME_JSON).
 		To(handleChannelGET))
 
-	ws.Route(ws.GET("/{channelName}/users").
+	ws.Route(ws.POST("/channel/{channelName}").
+		Consumes(restful.MIME_JSON).
+		Produces(restful.MIME_JSON).
+		To(handleChannel))
+
+	ws.Route(ws.GET("/users/{channelName}").
 		Produces(restful.MIME_JSON).
 		To(handleChannelUsers))
-
-	ws2 := new(restful.WebService)
 
 	ws.Route(ws.GET("/channels").
 		Produces(restful.MIME_JSON).
 		To(handleChannelList))
-
-	ws2.Route(ws.POST("/channel/{channelName}").
-		Consumes(restful.MIME_JSON).
-		Produces(restful.MIME_JSON).
-		To(handleChannel))
 
 	ws.Route(ws.POST("/heartbeatz").
 		Consumes(restful.MIME_JSON).
@@ -123,11 +119,13 @@ func main() {
 		Container:      restful.DefaultContainer}
 	restful.DefaultContainer.Filter(cors.Filter)
 	restful.Add(ws)
-	restful.Add(ws2)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func getCookie(req *restful.Request, cookieName string) *http.Cookie {
+	if req.Request == nil || req.Request.Cookies() == nil {
+		return nil
+	}
 	cookies := req.Request.Cookies()
 	for _, cookie := range cookies {
 		if cookie.Name == cookieName {
@@ -144,8 +142,13 @@ func updateUserStatus(user User, online bool) error {
 }
 
 func handleHeartbeatz(req *restful.Request, resp *restful.Response) {
-	cookieVal := getCookie(req, "ChatUserAuth").Value
+	cookie := getCookie(req, "ChatUserAuth")
+	if cookie == nil {
+		resp.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
+	cookieVal := cookie.Value
 	user := User{cookieVal: cookieVal}
 	users.Put(user, time.Now())
 
@@ -159,10 +162,21 @@ func handleHeartbeatz(req *restful.Request, resp *restful.Response) {
 }
 
 func handleChannelList(req *restful.Request, resp *restful.Response) {
-	cookieVal := getCookie(req, "ChatUserAuth").Value
+	cookie := getCookie(req, "ChatUserAuth")
+	if cookie == nil {
+		resp.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
+	cookieVal := cookie.Value
 	user := User{cookieVal: cookieVal}
 	res, err := db.Query("SELECT id FROM users where cookie=$1", user.cookieVal)
+	if err != nil {
+		log.Printf("DB error %v", err)
+		resp.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	res.Next()
 	var userID string
 	err = res.Scan(userID)
@@ -171,6 +185,7 @@ func handleChannelList(req *restful.Request, resp *restful.Response) {
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
 	err = res.Close()
 	if err != nil {
 		log.Printf("DB error %v", err)
@@ -218,7 +233,13 @@ func handleChannelList(req *restful.Request, resp *restful.Response) {
 }
 
 func handleChannel(req *restful.Request, resp *restful.Response) {
-	cookieVal := getCookie(req, "ChatUserAuth").Value
+	cookie := getCookie(req, "ChatUserAuth")
+	if cookie == nil {
+		resp.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	cookieVal := cookie.Value
 	channelName := req.PathParameter("channelName")
 
 	byteArr, err := io.ReadAll(req.Request.Body)
@@ -264,11 +285,23 @@ func handleChannel(req *restful.Request, resp *restful.Response) {
 }
 
 func handleChannelUsers(req *restful.Request, resp *restful.Response) {
-	cookieVal := getCookie(req, "ChatUserAuth").Value
+	cookie := getCookie(req, "ChatUserAuth")
+	if cookie == nil {
+		resp.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	cookieVal := cookie.Value
 	channelName := req.PathParameter("channelName")
 
 	user := User{cookieVal: cookieVal}
 	res, err := db.Query("SELECT id FROM users where cookie=$1", user.cookieVal)
+	if err != nil {
+		log.Printf("DB error %v", err)
+		resp.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	res.Next()
 	var userID string
 	err = res.Scan(userID)
@@ -285,6 +318,11 @@ func handleChannelUsers(req *restful.Request, resp *restful.Response) {
 	}
 
 	res, err = db.Query("SELECT id FROM listChannels where channel_name=$1", channelName)
+	if err != nil {
+		log.Printf("DB error %v", err)
+		resp.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	res.Next()
 	var channelID string
 	err = res.Scan(channelName)
