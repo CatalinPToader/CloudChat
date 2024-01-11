@@ -98,14 +98,3 @@ resource "kubernetes_cluster_role_binding" "portainer_cluster_role_binding" {
     api_group = "rbac.authorization.k8s.io"
   }
 }
-
-resource "kubernetes_secret" "portainer_admin_password_secret" {
-  metadata {
-    name      = "portainer-admin-password"
-    namespace = kubernetes_namespace.portainer_namespace.metadata[0].name
-  }
-
-  data = {
-    "portainer_admin_password" = file("./passwd.txt")
-  }
-}
