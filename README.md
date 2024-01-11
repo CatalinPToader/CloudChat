@@ -13,6 +13,8 @@ One needs to have installed on own machine the following:
 
 ## How to run everything
 
+**_Note:_** You might need to use **sudo** before sourcing scripts
+
 Go to portainer-deploy directory 
 
 Here execute commands:
