@@ -23,5 +23,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /chatbackend
 # https://docs.docker.com/engine/reference/builder/#expose
 EXPOSE 8080
 
+ENV POST_USER custom_user
+ENV POST_PASS custom_passwd
+ENV POST_HOST postgresql
+ENV POST_DB custom_db
+
 # Run
 CMD ["/chatbackend"]
