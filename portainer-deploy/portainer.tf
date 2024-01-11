@@ -2,16 +2,9 @@ provider "kubernetes" {
   config_path = "./mykubeconfig"  # Path to your kubeconfig file
 }
 
-resource "kubernetes_namespace" "portainer_namespace" {
-  metadata {
-    name = "portainer"
-  }
-}
-
 resource "kubernetes_deployment" "portainer_deployment" {
   metadata {
     name      = "portainer"
-    namespace = kubernetes_namespace.portainer_namespace.metadata[0].name
   }
 
   spec {
@@ -39,8 +32,9 @@ resource "kubernetes_deployment" "portainer_deployment" {
           }
           command = [
             "/portainer",
-            "--admin-password",
-            "$2y$05$w5wsvlEDXxPjh2GGfkoe9.At0zj8r7DeafAkXXeubs0JnmxLjyw/a",
+           // "--no-auth" - deprecated 
+           "--admin-password",
+           "$2y$05$w5wsvlEDXxPjh2GGfkoe9.At0zj8r7DeafAkXXeubs0JnmxLjyw/a",
           ]
         }
       }
@@ -51,7 +45,6 @@ resource "kubernetes_deployment" "portainer_deployment" {
 resource "kubernetes_service" "portainer_service" {
   metadata {
     name      = "portainer"
-    namespace = kubernetes_namespace.portainer_namespace.metadata[0].name
   }
 
   spec {
@@ -89,7 +82,6 @@ resource "kubernetes_cluster_role_binding" "portainer_cluster_role_binding" {
   subject {
     kind      = "ServiceAccount"
     name      = "default"
-    namespace = kubernetes_namespace.portainer_namespace.metadata[0].name
   }
 
   role_ref {
