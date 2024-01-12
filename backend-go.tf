@@ -23,6 +23,9 @@ resource "kubernetes_deployment" "backend_deployment" {
         container {
           image = "localhost:5001/cloudchat-backend:latest"
           name  = "backend"
+          port {
+            container_port = 8080
+          }
         }
       }
     }

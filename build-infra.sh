@@ -1,5 +1,4 @@
 #!/bin/bash
-set -o errexit
 
 reg_name='kind-registry'
 reg_port='5001'
