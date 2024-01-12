@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Application</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+	<div id="logo-container">
+	    <img src="CloudChatLogo.png" alt="Logo" id="app-logo">
+	</div>
+    <div id="app-container">
+        <div id="channels-panel">
+        	<div id="channels-title">Channels</div>
+            <ul id="channels-list">
+                <!-- Channel list items go here -->
+                <ul id="channels-list">
+	                <li>Channel 1</li>
+	                <li>Channel 2</li>
+	                <li>Channel 3</li>
+	            </ul>
+            </ul>
+        </div>
+        <div id="chat-container">
+        	<div id="chat-title">Chat Room</div>
+            <div id="chat-messages"></div>
+            <div id="input-container">
+                <textarea id="message-input" placeholder="Type your message..."></textarea>
+                <button id="send-button">Send</button>
+            </div>
+        </div>
+        <div id="users-panel">
+        	<div id="users-title">Users</div>
+            <ul id="users-list">
+                <!-- Channel list items go here -->
+                <ul id="users-list">
+	                <li>User 1</li>
+	                <li>User 2</li>
+	                <li>User 3</li>
+	            </ul>
+            </ul>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+</body>
+</html>
