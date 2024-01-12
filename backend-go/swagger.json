@@ -1,0 +1,236 @@
+{
+ "swagger": "2.0",
+ "info": {
+  "description": "Resource for managing Users",
+  "title": "UserService",
+  "contact": {
+   "name": "john",
+   "url": "http://johndoe.org",
+   "email": "john@doe.rp"
+  },
+  "license": {
+   "name": "MIT",
+   "url": "http://mit.org"
+  },
+  "version": "1.0.0"
+ },
+ "paths": {
+  "/channel/{channelName}": {
+   "get": {
+    "produces": [
+     "application/json"
+    ],
+    "tags": [
+     ""
+    ],
+    "summary": "Gets messages from channel",
+    "operationId": "handleChannelGET",
+    "parameters": [
+     {
+      "type": "string",
+      "default": "public_1",
+      "description": "name of the channel",
+      "name": "channelName",
+      "in": "path",
+      "required": true
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "schema": {
+       "$ref": "#/definitions/main.ChannelMessageList"
+      }
+     },
+     "500": {
+      "description": "Internal Server Error"
+     }
+    }
+   },
+   "post": {
+    "consumes": [
+     "application/json"
+    ],
+    "tags": [
+     ""
+    ],
+    "summary": "Posts messages from channel",
+    "operationId": "handleChannel",
+    "parameters": [
+     {
+      "type": "string",
+      "default": "public_1",
+      "description": "name of the channel",
+      "name": "channelName",
+      "in": "path",
+      "required": true
+     },
+     {
+      "name": "body",
+      "in": "body",
+      "required": true,
+      "schema": {
+       "$ref": "#/definitions/main.Message"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK"
+     },
+     "500": {
+      "description": "Internal Server Error"
+     }
+    }
+   }
+  },
+  "/channels": {
+   "get": {
+    "produces": [
+     "application/json"
+    ],
+    "tags": [
+     ""
+    ],
+    "summary": "Gets channels user has access to",
+    "operationId": "handleChannelList",
+    "responses": {
+     "200": {
+      "description": "OK",
+      "schema": {
+       "$ref": "#/definitions/main.ChannelList"
+      }
+     },
+     "500": {
+      "description": "Internal Server Error"
+     }
+    }
+   }
+  },
+  "/heartbeatz": {
+   "post": {
+    "tags": [
+     ""
+    ],
+    "summary": "Allows user to send a heartbeat",
+    "operationId": "handleHeartbeatz",
+    "responses": {
+     "200": {
+      "description": "OK"
+     },
+     "500": {
+      "description": "Internal Server Error"
+     }
+    }
+   }
+  },
+  "/users/{channelName}": {
+   "get": {
+    "produces": [
+     "application/json"
+    ],
+    "tags": [
+     ""
+    ],
+    "summary": "Gets online users from channel",
+    "operationId": "handleChannelUsers",
+    "parameters": [
+     {
+      "type": "string",
+      "default": "public_1",
+      "description": "name of the channel",
+      "name": "channelName",
+      "in": "path",
+      "required": true
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "schema": {
+       "$ref": "#/definitions/main.UserList"
+      }
+     },
+     "500": {
+      "description": "Internal Server Error"
+     }
+    }
+   }
+  }
+ },
+ "definitions": {
+  "main.ChannelList": {
+   "required": [
+    "channel_list"
+   ],
+   "properties": {
+    "channel_list": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "main.ChannelMessage": {
+   "required": [
+    "message",
+    "timestamp",
+    "username"
+   ],
+   "properties": {
+    "message": {
+     "type": "string"
+    },
+    "timestamp": {
+     "type": "integer",
+     "format": "int64"
+    },
+    "username": {
+     "type": "string"
+    }
+   }
+  },
+  "main.ChannelMessageList": {
+   "required": [
+    "message_list"
+   ],
+   "properties": {
+    "message_list": {
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/main.ChannelMessage"
+     }
+    }
+   }
+  },
+  "main.Message": {
+   "required": [
+    "message"
+   ],
+   "properties": {
+    "message": {
+     "type": "string"
+    }
+   }
+  },
+  "main.UserList": {
+   "required": [
+    "user_list"
+   ],
+   "properties": {
+    "user_list": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  }
+ },
+ "tags": [
+  {
+   "description": "Everything"
+  }
+ ]
+}

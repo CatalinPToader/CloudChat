@@ -4,7 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	_ "github.com/emicklei/go-restful-openapi/v2"
+	restfulspec "github.com/emicklei/go-restful-openapi/v2"
 	"github.com/emicklei/go-restful/v3"
+	"github.com/go-openapi/spec"
+	_ "github.com/go-openapi/spec"
 	_ "github.com/lib/pq"
 	"io"
 	"log"
@@ -78,9 +82,11 @@ func main() {
 	postgresPass := os.Getenv("POST_PASS")
 	postgresHost := os.Getenv("POST_HOST")
 	postgresDB := os.Getenv("POST_DB")
-	connStr := fmt.Sprintf("postgres://%s:%s@%s/%s", postgresUser, postgresPass, postgresHost, postgresDB)
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
+		"password=%s dbname=%s sslmode=disable",
+		postgresHost, 5432, postgresUser, postgresPass, postgresDB)
 	// Connect to database
-	db, err = sql.Open("postgres", connStr)
+	db, err = sql.Open("postgres", psqlInfo)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -89,26 +95,52 @@ func main() {
 
 	ws := new(restful.WebService)
 
+	tags := []string{""}
+
 	ws.Route(ws.GET("/channel/{channelName}").
 		Produces(restful.MIME_JSON).
+		Doc("Gets messages from channel").
+		Param(ws.PathParameter("channelName", "name of the channel").DataType("string").DefaultValue("public_1")).
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Writes(ChannelMessageList{}). // on the response
+		Returns(200, "OK", ChannelMessageList{}).
+		Returns(500, "Internal Server Error", nil).
 		To(handleChannelGET))
 
 	ws.Route(ws.POST("/channel/{channelName}").
 		Consumes(restful.MIME_JSON).
-		Produces(restful.MIME_JSON).
+		Doc("Posts messages from channel").
+		Param(ws.PathParameter("channelName", "name of the channel").DataType("string").DefaultValue("public_1")).
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Reads(Message{}). // on the response
+		Returns(200, "OK", nil).
+		Returns(500, "Internal Server Error", nil).
 		To(handleChannel))
 
 	ws.Route(ws.GET("/users/{channelName}").
 		Produces(restful.MIME_JSON).
+		Doc("Gets online users from channel").
+		Param(ws.PathParameter("channelName", "name of the channel").DataType("string").DefaultValue("public_1")).
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Writes(UserList{}). // on the response
+		Returns(200, "OK", UserList{}).
+		Returns(500, "Internal Server Error", nil).
 		To(handleChannelUsers))
 
 	ws.Route(ws.GET("/channels").
 		Produces(restful.MIME_JSON).
+		Doc("Gets channels user has access to").
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Writes(ChannelList{}). // on the response
+		Returns(200, "OK", ChannelList{}).
+		Returns(500, "Internal Server Error", nil).
 		To(handleChannelList))
 
 	ws.Route(ws.POST("/heartbeatz").
-		Consumes(restful.MIME_JSON).
-		Produces(restful.MIME_JSON).
+		Doc("Allows user to send a heartbeat").
+		Metadata(restfulspec.KeyOpenAPITags, tags).
+		Returns(200, "OK", nil).
+		Returns(500, "Internal Server Error", nil).
 		To(handleHeartbeatz))
 
 	cors := restful.CrossOriginResourceSharing{
@@ -119,6 +151,13 @@ func main() {
 		Container:      restful.DefaultContainer}
 	restful.DefaultContainer.Filter(cors.Filter)
 	restful.Add(ws)
+
+	config := restfulspec.Config{
+		WebServices:                   restful.RegisteredWebServices(), // you control what services are visible
+		APIPath:                       "/swagger.json",
+		PostBuildSwaggerObjectHandler: enrichSwaggerObject}
+	restful.DefaultContainer.Add(restfulspec.NewOpenAPIService(config))
+
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -154,7 +193,7 @@ func handleHeartbeatz(req *restful.Request, resp *restful.Response) {
 
 	err := updateUserStatus(user, true)
 	if err != nil {
-		log.Printf("DB error %v", err)
+		log.Printf("DB error update user status %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
 	}
 
@@ -170,32 +209,17 @@ func handleChannelList(req *restful.Request, resp *restful.Response) {
 
 	cookieVal := cookie.Value
 	user := User{cookieVal: cookieVal}
-	res, err := db.Query("SELECT id FROM users where cookie=$1", user.cookieVal)
+
+	userID, err := getUserID(user)
 	if err != nil {
-		log.Printf("DB error %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	res.Next()
-	var userID string
-	err = res.Scan(userID)
-	if err != nil {
-		log.Printf("DB error %v", err)
-		resp.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	err = res.Close()
-	if err != nil {
-		log.Printf("DB error %v", err)
-		resp.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
+	var res *sql.Rows
 	res, err = db.Query("SELECT channel_name FROM listChannels WHERE id = (SELECT channelID from allowedChannel where userID = $1) OR public = true", userID)
 	if err != nil {
-		log.Printf("DB error %v", err)
+		log.Printf("DB error query channel list %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -204,9 +228,9 @@ func handleChannelList(req *restful.Request, resp *restful.Response) {
 	var channels []string
 
 	for res.Next() {
-		err = res.Scan(channel)
+		err = res.Scan(&channel)
 		if err != nil {
-			log.Printf("DB error %v", err)
+			log.Printf("DB error scan channel name %v", err)
 			resp.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -258,25 +282,15 @@ func handleChannel(req *restful.Request, resp *restful.Response) {
 	}
 
 	user := User{cookieVal: cookieVal}
-	res, err := db.Query("SELECT id FROM users where cookie=$1", user.cookieVal)
-	res.Next()
-	var userID string
-	err = res.Scan(userID)
+
+	userID, err := getUserID(user)
 	if err != nil {
-		log.Printf("DB error %v", err)
-		resp.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	err = res.Close()
-	if err != nil {
-		log.Printf("DB error %v", err)
-		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	_, err = db.Exec("INSERT INTO $1 (userID, msg) VALUES ($2, $3)", channelName, userID, msg.Message)
 	if err != nil {
-		log.Printf("DB error %v", err)
+		log.Printf("DB error insert user message %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -295,53 +309,38 @@ func handleChannelUsers(req *restful.Request, resp *restful.Response) {
 	channelName := req.PathParameter("channelName")
 
 	user := User{cookieVal: cookieVal}
-	res, err := db.Query("SELECT id FROM users where cookie=$1", user.cookieVal)
+
+	_, err := getUserID(user)
 	if err != nil {
-		log.Printf("DB error %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	res.Next()
-	var userID string
-	err = res.Scan(userID)
+	res, err := db.Query("SELECT id FROM listChannels where channel_name=$1", channelName)
 	if err != nil {
-		log.Printf("DB error %v", err)
-		resp.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	err = res.Close()
-	if err != nil {
-		log.Printf("DB error %v", err)
-		resp.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	res, err = db.Query("SELECT id FROM listChannels where channel_name=$1", channelName)
-	if err != nil {
-		log.Printf("DB error %v", err)
+		log.Printf("DB error query channel id %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	res.Next()
 	var channelID string
-	err = res.Scan(channelName)
+	err = res.Scan(&channelID)
 	if err != nil {
-		log.Printf("DB error %v", err)
+		log.Printf("DB error scan channel id %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	err = res.Close()
 	if err != nil {
-		log.Printf("DB error %v", err)
+		log.Printf("DB error close %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	res, err = db.Query("SELECT username FROM users WHERE online = true AND lastChannel = $1", channelID)
 	if err != nil {
-		log.Printf("DB error %v", err)
+		log.Printf("DB error query online users %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -350,9 +349,9 @@ func handleChannelUsers(req *restful.Request, resp *restful.Response) {
 	var usersInChannel []string
 
 	for res.Next() {
-		err = res.Scan(username)
+		err = res.Scan(&username)
 		if err != nil {
-			log.Printf("DB error %v", err)
+			log.Printf("DB error scan username for online users %v", err)
 			resp.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -378,12 +377,34 @@ func handleChannelUsers(req *restful.Request, resp *restful.Response) {
 	return
 }
 
+func getUserID(user User) (string, error) {
+	res, err := db.Query("SELECT id FROM users where cookie=$1", user.cookieVal)
+	if err != nil {
+		log.Printf("DB error query user id %v", err)
+		return "", err
+	}
+
+	res.Next()
+	var userID string
+	err = res.Scan(&userID)
+	if err != nil {
+		log.Printf("DB error scan user id %v", err)
+		return "", err
+	}
+	err = res.Close()
+	if err != nil {
+		log.Printf("DB error close %v", err)
+		return "", err
+	}
+	return userID, nil
+}
+
 func handleChannelGET(req *restful.Request, resp *restful.Response) {
 	channelName := req.PathParameter("channelName")
 
-	res, err := db.Query("SELECT username, extract(epoch from stamp), msg FROM $1 LIMIT 100", channelName)
+	res, err := db.Query(fmt.Sprintf("SELECT username, extract(epoch from stamp), msg FROM %s LIMIT 100", channelName))
 	if err != nil {
-		log.Printf("DB error %v", err)
+		log.Printf("DB error query channel messages %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -394,9 +415,9 @@ func handleChannelGET(req *restful.Request, resp *restful.Response) {
 	var messages []ChannelMessage
 
 	for res.Next() {
-		err = res.Scan(username, unix, msg)
+		err = res.Scan(&username, &unix, &msg)
 		if err != nil {
-			log.Printf("DB error %v", err)
+			log.Printf("DB error scan user, stamp, message %v", err)
 			resp.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -420,4 +441,30 @@ func handleChannelGET(req *restful.Request, resp *restful.Response) {
 	}
 
 	return
+}
+
+func enrichSwaggerObject(swo *spec.Swagger) {
+	swo.Info = &spec.Info{
+		InfoProps: spec.InfoProps{
+			Title:       "UserService",
+			Description: "Resource for managing Users",
+			Contact: &spec.ContactInfo{
+				ContactInfoProps: spec.ContactInfoProps{
+					Name:  "john",
+					Email: "john@doe.rp",
+					URL:   "http://johndoe.org",
+				},
+			},
+			License: &spec.License{
+				LicenseProps: spec.LicenseProps{
+					Name: "MIT",
+					URL:  "http://mit.org",
+				},
+			},
+			Version: "1.0.0",
+		},
+	}
+	swo.Tags = []spec.Tag{spec.Tag{TagProps: spec.TagProps{
+		Name:        "",
+		Description: "Everything"}}}
 }
