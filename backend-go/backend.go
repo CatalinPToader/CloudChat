@@ -274,7 +274,7 @@ func handleChannel(req *restful.Request, resp *restful.Response) {
 		return
 	}
 
-	_, err = db.Exec("INSERT INTO $1 (userID, message) VALUES ($2, $3)", channelName, userID, msg.Message)
+	_, err = db.Exec("INSERT INTO $1 (userID, msg) VALUES ($2, $3)", channelName, userID, msg.Message)
 	if err != nil {
 		log.Printf("DB error %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
@@ -381,7 +381,7 @@ func handleChannelUsers(req *restful.Request, resp *restful.Response) {
 func handleChannelGET(req *restful.Request, resp *restful.Response) {
 	channelName := req.PathParameter("channelName")
 
-	res, err := db.Query("SELECT username, extract(epoch from timestamp), message FROM $1 LIMIT 100", channelName)
+	res, err := db.Query("SELECT username, extract(epoch from stamp), msg FROM $1 LIMIT 100", channelName)
 	if err != nil {
 		log.Printf("DB error %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
