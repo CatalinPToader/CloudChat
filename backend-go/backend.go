@@ -137,6 +137,7 @@ func main() {
 		To(handleChannelList))
 
 	ws.Route(ws.POST("/heartbeatz").
+		Produces(restful.MIME_JSON).
 		Doc("Allows user to send a heartbeat").
 		Metadata(restfulspec.KeyOpenAPITags, tags).
 		Returns(200, "OK", nil).
@@ -283,14 +284,21 @@ func handleChannel(req *restful.Request, resp *restful.Response) {
 
 	user := User{cookieVal: cookieVal}
 
-	userID, err := getUserID(user)
+	userID, err := getUsername(user)
 	if err != nil {
 		return
 	}
 
-	_, err = db.Exec("INSERT INTO $1 (userID, msg) VALUES ($2, $3)", channelName, userID, msg.Message)
+	_, err = db.Exec(fmt.Sprintf("INSERT INTO %s (username, msg) VALUES ($1, $2)", channelName), userID, msg.Message)
 	if err != nil {
 		log.Printf("DB error insert user message %v", err)
+		resp.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	_, err = db.Exec("UPDATE users SET lastChannel = (SELECT id from listChannels where channel_name=$1) WHERE cookie=$2", channelName, cookieVal)
+	if err != nil {
+		log.Printf("DB error update user channel %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -399,10 +407,32 @@ func getUserID(user User) (string, error) {
 	return userID, nil
 }
 
+func getUsername(user User) (string, error) {
+	res, err := db.Query("SELECT username FROM users where cookie=$1", user.cookieVal)
+	if err != nil {
+		log.Printf("DB error query username %v", err)
+		return "", err
+	}
+
+	res.Next()
+	var userID string
+	err = res.Scan(&userID)
+	if err != nil {
+		log.Printf("DB error scan username %v", err)
+		return "", err
+	}
+	err = res.Close()
+	if err != nil {
+		log.Printf("DB error close %v", err)
+		return "", err
+	}
+	return userID, nil
+}
+
 func handleChannelGET(req *restful.Request, resp *restful.Response) {
 	channelName := req.PathParameter("channelName")
 
-	res, err := db.Query(fmt.Sprintf("SELECT username, extract(epoch from stamp), msg FROM %s LIMIT 100", channelName))
+	res, err := db.Query(fmt.Sprintf("SELECT username, extract(epoch from stamp)::bigint, msg FROM %s LIMIT 100", channelName))
 	if err != nil {
 		log.Printf("DB error query channel messages %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
