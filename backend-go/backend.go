@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"sync"
 	"time"
 )
@@ -144,6 +145,11 @@ func main() {
 		Returns(500, "Internal Server Error", nil).
 		To(handleHeartbeatz))
 
+	ws.Route(ws.GET("/chat/{subpath:*}").
+		To(handleSubFile))
+	ws.Route(ws.GET("/chat").
+		To(handleFile))
+
 	cors := restful.CrossOriginResourceSharing{
 		AllowedHeaders: []string{"Content-Type", "Accept"},
 		AllowedDomains: []string{},
@@ -162,6 +168,22 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
+func handleSubFile(req *restful.Request, resp *restful.Response) {
+	actual := path.Join(req.PathParameter("subpath"))
+	fmt.Printf("serving %s ... (from %s)\n", actual, req.PathParameter("subpath"))
+	http.ServeFile(
+		resp.ResponseWriter,
+		req.Request,
+		actual)
+}
+
+func handleFile(req *restful.Request, resp *restful.Response) {
+	http.ServeFile(
+		resp.ResponseWriter,
+		req.Request,
+		path.Join(req.QueryParameter("resource")))
+}
+
 func getCookie(req *restful.Request, cookieName string) *http.Cookie {
 	if req.Request == nil || req.Request.Cookies() == nil {
 		return nil
@@ -177,8 +199,13 @@ func getCookie(req *restful.Request, cookieName string) *http.Cookie {
 }
 
 func updateUserStatus(user User, online bool) error {
-	_, err := db.Exec("UPDATE users SET online = $1 where cookie = $2", online, user.cookieVal)
-	return err
+	if online {
+		_, err := db.Exec("UPDATE users SET online = $1 where cookie = $2", online, user.cookieVal)
+		return err
+	} else {
+		_, err := db.Exec("UPDATE users SET online = $1, lastchannel=NULL where cookie = $2", online, user.cookieVal)
+		return err
+	}
 }
 
 func handleHeartbeatz(req *restful.Request, resp *restful.Response) {
@@ -241,13 +268,7 @@ func handleChannelList(req *restful.Request, resp *restful.Response) {
 
 	channelList := ChannelList{List: channels}
 
-	marshalled, err := json.Marshal(channelList)
-	if err != nil {
-		log.Printf("Could not marshall channel list")
-		resp.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	_, err = resp.Write(marshalled)
+	err = resp.WriteAsJson(channelList)
 	if err != nil {
 		log.Printf("Writing channel list to response error %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
@@ -277,7 +298,7 @@ func handleChannel(req *restful.Request, resp *restful.Response) {
 
 	err = json.Unmarshal(byteArr, &msg)
 	if err != nil {
-		log.Printf("Could not unmarshall games request")
+		log.Printf("Could not unmarshall message")
 		resp.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -369,13 +390,7 @@ func handleChannelUsers(req *restful.Request, resp *restful.Response) {
 
 	userList := UserList{List: usersInChannel}
 
-	marshalled, err := json.Marshal(userList)
-	if err != nil {
-		log.Printf("Could not marshall user list")
-		resp.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	_, err = resp.Write(marshalled)
+	err = resp.WriteAsJson(userList)
 	if err != nil {
 		log.Printf("Writing user list to response error %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
@@ -457,13 +472,7 @@ func handleChannelGET(req *restful.Request, resp *restful.Response) {
 
 	messageList := ChannelMessageList{List: messages}
 
-	marshalled, err := json.Marshal(messageList)
-	if err != nil {
-		log.Printf("Could not marshall message list")
-		resp.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	_, err = resp.Write(marshalled)
+	err = resp.WriteAsJson(messageList)
 	if err != nil {
 		log.Printf("Writing message list to response error %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
@@ -478,23 +487,10 @@ func enrichSwaggerObject(swo *spec.Swagger) {
 		InfoProps: spec.InfoProps{
 			Title:       "UserService",
 			Description: "Resource for managing Users",
-			Contact: &spec.ContactInfo{
-				ContactInfoProps: spec.ContactInfoProps{
-					Name:  "john",
-					Email: "john@doe.rp",
-					URL:   "http://johndoe.org",
-				},
-			},
-			License: &spec.License{
-				LicenseProps: spec.LicenseProps{
-					Name: "MIT",
-					URL:  "http://mit.org",
-				},
-			},
-			Version: "1.0.0",
+			Version:     "1.0.0",
 		},
 	}
-	swo.Tags = []spec.Tag{spec.Tag{TagProps: spec.TagProps{
+	swo.Tags = []spec.Tag{{TagProps: spec.TagProps{
 		Name:        "",
 		Description: "Everything"}}}
 }
