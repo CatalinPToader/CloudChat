@@ -92,7 +92,7 @@
                     // Redirect user to dashboard
                     window.location = "http://"+window.location.hostname+":32080/chat";
                 } else {
-                    alert("Log in failed.");
+                    alert("Log in failed " + reponse.json);
                 }
             })
             .catch(error => {

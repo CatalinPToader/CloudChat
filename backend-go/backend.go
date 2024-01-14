@@ -245,7 +245,7 @@ func handleChannelList(req *restful.Request, resp *restful.Response) {
 	}
 
 	var res *sql.Rows
-	res, err = db.Query("SELECT channel_name FROM listChannels WHERE id = (SELECT channelID from allowedChannel where userID = $1) OR public = true", userID)
+	res, err = db.Query("SELECT channel_name FROM listChannels WHERE id in (SELECT channelID from allowedChannel where userID = $1) OR public = true", userID)
 	if err != nil {
 		log.Printf("DB error query channel list %v", err)
 		resp.WriteHeader(http.StatusInternalServerError)
