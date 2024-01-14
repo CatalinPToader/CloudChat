@@ -5,9 +5,11 @@ import json
 import requests
 import psycopg2
 import os
+import jwt
 from firebase_admin import credentials, auth
-from flask import Flask, request, render_template, make_response
+from flask import Flask, request, render_template, make_response, url_for
 from functools import wraps
+import logging
 
 #App configuration
 app = Flask(__name__)
@@ -38,24 +40,25 @@ def add_to_db(db_string):
     postgres_db = os.getenv("POST_DB")
 
     conn = psycopg2.connect(
-        host=postgres_user,
-        database=postgress_pass,
-        user=postgres_host,
-        password=postgres_db
+        host=postgres_host,
+        database=postgres_db,
+        user=postgres_user,
+        password=postgress_pass
     )
 
     cur = conn.cursor()
 
     try:
         cur.execute(db_string)
-        cur.fetchone()
+        conn.commit()
     except psycopg2.errors.DatabaseError as e:
         cur.close()
         conn.rollback()
         logging.error(f"Error at database: {e}")
-        return HTTPStatus.BAD_REQUEST
+        return e
 
     cur.close()
+    return None
 
 #Api route for signup
 @app.route("/signup", methods=['GET', 'POST'])
@@ -82,7 +85,7 @@ def signup():
 
             #Get token
             try:
-                auth_resp = requests.get('http://127.0.0.1:5000/api/token', data={'email': email, 'password': password})
+                auth_resp = requests.get(url_for('token', _external=True), data={'email': email, 'password': password})
             except Exception as e:
                 return {'message': f'There was an error signing up: {str(e)}'}, 400
     
@@ -90,15 +93,17 @@ def signup():
             if 'token' not in auth_json:
                 return auth_json, auth_resp.status_code
 
-            token = auth_json['token']
+            token = auth_json['token']            
+            decoded = jwt.decode(token, options={"verify_signature": False}) # works in PyJWT >= v2.0
 
             #Set cookie
             resp = make_response({})
-            resp.set_cookie('ChatUserAuth', token)
+            resp.set_cookie('ChatUserAuth', decoded['user_id'])
 
-            add_to_db("""
-              INSERT INTO users (id, username, cookie) VALUES (gen_random_uuid(), %(email)s, %(token)s);
-                """)
+            e = add_to_db(f"INSERT INTO users (id, username, cookie) VALUES (gen_random_uuid(), '{email}', '{decoded['user_id']}');")
+            
+            if e != None:
+                return {'message': f'Error creating user: {str(e)}'}, 400
 
             return {'message': f'Successfully created user {user.uid}'}, 200
         except Exception as e:
@@ -130,7 +135,7 @@ def login():
 
     #Get token
     try:
-        auth_resp = requests.get('http://127.0.0.1:5000/api/token', data={'email': email, 'password': password})
+        auth_resp = requests.get(url_for('token', _external=True), data={'email': email, 'password': password})
     except Exception as e:
         return {'message': f'There was an error logging in: {str(e)}'},400
 
@@ -139,14 +144,16 @@ def login():
         return auth_json, auth_resp.status_code
 
     token = auth_json['token']
+    decoded = jwt.decode(token, options={"verify_signature": False}) # works in PyJWT >= v2.0
 
     #set cookie
     resp = make_response({})
-    resp.set_cookie('ChatUserAuth', token)
+    resp.set_cookie('ChatUserAuth', decoded['user_id'])
 
-    add_to_db("""
-              UPDATE users set cookie = %(token)s WHERE username = %(email)s;
-                """)
+    e = add_to_db(f"UPDATE users set cookie = '{decoded['user_id']}' WHERE username = '{email}';")
+    
+    if e != None:
+        return {'message': f'Error creating user: {str(e)}'}, 400
 
     return resp
 
