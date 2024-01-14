@@ -3,7 +3,7 @@
         "1": {
             "Name": "CCServer",
             "Group": "Servers",
-            "Host": "postgresql",
+            "Host": "postgresql.postgresql-namespace",
             "Port": 5432,
             "MaintenanceDB": "custom_db",
             "Username": "custom_user",

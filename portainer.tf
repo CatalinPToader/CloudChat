@@ -1,10 +1,11 @@
 provider "kubernetes" {
-  config_path = "./mykubeconfig"  # Path to your kubeconfig file
+  config_path = "./mykubeconfig" # Path to your kubeconfig file
 }
 
 resource "kubernetes_deployment" "portainer_deployment" {
   metadata {
-    name      = "portainer"
+    name = "portainer"
+    namespace = kubernetes_namespace.portainer_namespace.metadata[0].name
   }
 
   spec {
@@ -32,9 +33,9 @@ resource "kubernetes_deployment" "portainer_deployment" {
           }
           command = [
             "/portainer",
-           // "--no-auth" - deprecated 
-           "--admin-password",
-           "$2y$05$w5wsvlEDXxPjh2GGfkoe9.At0zj8r7DeafAkXXeubs0JnmxLjyw/a",
+            // "--no-auth" - deprecated 
+            "--admin-password",
+            "$2y$05$w5wsvlEDXxPjh2GGfkoe9.At0zj8r7DeafAkXXeubs0JnmxLjyw/a",
           ]
         }
       }
@@ -60,13 +61,14 @@ resource "kubernetes_cluster_role_binding" "portainer_cluster_role_binding" {
   }
 
   subject {
-    kind      = "ServiceAccount"
-    name      = "default"
+    kind = "ServiceAccount"
+    name = "default"
+    namespace = kubernetes_namespace.portainer_namespace.metadata[0].name
   }
 
   role_ref {
-    kind     = "ClusterRole"
-    name     = kubernetes_cluster_role.portainer_cluster_role.metadata[0].name
+    kind      = "ClusterRole"
+    name      = kubernetes_cluster_role.portainer_cluster_role.metadata[0].name
     api_group = "rbac.authorization.k8s.io"
   }
 }

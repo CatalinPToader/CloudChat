@@ -1,6 +1,7 @@
 resource "kubernetes_service" "portainer_service" {
   metadata {
-    name      = "portainer"
+    name = "portainer"
+    namespace = kubernetes_namespace.portainer_namespace.metadata[0].name
   }
 
   spec {

@@ -1,6 +1,7 @@
 resource "kubernetes_service" "backend_go_service" {
   metadata {
-    name      = "backend"
+    name = "backend"
+    namespace = kubernetes_namespace.backend_namespace.metadata[0].name
   }
 
   spec {

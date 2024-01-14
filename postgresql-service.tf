@@ -1,6 +1,7 @@
 resource "kubernetes_service" "postgresql_service" {
   metadata {
-    name      = "postgresql"
+    name = "postgresql"
+    namespace = kubernetes_namespace.postgresql_namespace.metadata[0].name
   }
 
   spec {
