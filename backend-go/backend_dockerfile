@@ -27,7 +27,7 @@ EXPOSE 8080
 
 ENV POST_USER="custom_user"
 ENV POST_PASS="custom_passwd"
-ENV POST_HOST="postgresql"
+ENV POST_HOST="postgresql.postgresql-namespace"
 ENV POST_DB="custom_db"
 
 # Run

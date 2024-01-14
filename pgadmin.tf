@@ -1,6 +1,7 @@
 resource "kubernetes_config_map" "pgadmin_configmap" {
   metadata {
     name = "pgadmin-config"
+    namespace = kubernetes_namespace.pgadmin_namespace.metadata[0].name
   }
 
   data = {
@@ -10,7 +11,8 @@ resource "kubernetes_config_map" "pgadmin_configmap" {
 
 resource "kubernetes_deployment" "pgadmin_deployment" {
   metadata {
-    name      = "pgadmin"
+    name = "pgadmin"
+    namespace = kubernetes_namespace.pgadmin_namespace.metadata[0].name
   }
 
   spec {
@@ -45,15 +47,15 @@ resource "kubernetes_deployment" "pgadmin_deployment" {
             value = "admin"
           }
           env {
-            name = "PGADMIN_CONFIG_SERVER_MODE"
+            name  = "PGADMIN_CONFIG_SERVER_MODE"
             value = "False"
           }
           env {
-            name = "PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED"
+            name  = "PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED"
             value = "False"
           }
-           env {
-            name = "PGADMIN_SERVER_JSON_FILE"
+          env {
+            name  = "PGADMIN_SERVER_JSON_FILE"
             value = "/pgadmin4/config/servers"
           }
           volume_mount {
@@ -63,7 +65,7 @@ resource "kubernetes_deployment" "pgadmin_deployment" {
           command = [
             "/bin/sh",
             "-c",
-            "/bin/echo 'postgresql:5432:custom_db:custom_user:custom_passwd' > /tmp/pgpassfile && chmod 600 /tmp/pgpassfile && /entrypoint.sh",
+            "/bin/echo 'postgresql.postgresql-namespace:5432:custom_db:custom_user:custom_passwd' > /tmp/pgpassfile && chmod 600 /tmp/pgpassfile && /entrypoint.sh",
           ]
         }
         volume {

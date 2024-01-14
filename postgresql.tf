@@ -1,6 +1,7 @@
 resource "kubernetes_config_map" "psql_configmap" {
   metadata {
     name = "psql-config"
+    namespace = kubernetes_namespace.postgresql_namespace.metadata[0].name
   }
 
   data = {
@@ -10,7 +11,8 @@ resource "kubernetes_config_map" "psql_configmap" {
 
 resource "kubernetes_deployment" "postgresql_deployment" {
   metadata {
-    name      = "postgresql"
+    name = "postgresql"
+    namespace = kubernetes_namespace.postgresql_namespace.metadata[0].name
   }
 
   spec {
@@ -55,8 +57,8 @@ resource "kubernetes_deployment" "postgresql_deployment" {
           startup_probe {
             exec {
               command = [
-                "bin/sh", 
-                "-c", 
+                "bin/sh",
+                "-c",
                 "psql -h localhost -U custom_user -d custom_db -f /docker-entrypoint-initdb.d/initdb/custom-db-init.sql"
               ]
             }
