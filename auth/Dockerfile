@@ -7,9 +7,9 @@ COPY firebaseConfig.json /app/
 COPY app.py /app/
 ADD templates /app/templates
 WORKDIR /app
-EXPOSE 5000
+EXPOSE 9000
 ENV POST_USER="custom_user"
 ENV POST_PASS="custom_passwd"
-ENV POST_HOST="postgresql"
+ENV POST_HOST="postgresql.postgresql-namespace"
 ENV POST_DB="custom_db"
 CMD ["python", "app.py"]
