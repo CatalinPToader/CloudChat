@@ -97,7 +97,7 @@
                     // Redirect new user to explore
                     window.location.href = "/"
                 } else {
-                    alert("Sign up failed.");
+                    alert("Sign up failed " + response.json);
                 }
             })
             .catch(function(error) {

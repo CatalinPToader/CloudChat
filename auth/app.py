@@ -19,6 +19,11 @@ cred = credentials.Certificate('fbAdminConfig_private_key.json')
 firebase = firebase_admin.initialize_app(cred)
 pb = pyrebase.initialize_app(json.load(open('firebaseConfig.json')))
 
+postgres_user = os.getenv("POST_USER")
+postgress_pass = os.getenv("POST_PASS")
+postgres_host = os.getenv("POST_HOST")
+postgres_db = os.getenv("POST_DB")
+
 #Wrapper for token verification
 def check_token(f):
     @wraps(f)
@@ -33,12 +38,31 @@ def check_token(f):
         return f(*args, **kwargs)
     return wrap
     
-def add_to_db(db_string):
-    postgres_user = os.getenv("POST_USER")
-    postgress_pass = os.getenv("POST_PASS")
-    postgres_host = os.getenv("POST_HOST")
-    postgres_db = os.getenv("POST_DB")
+    
+def check_db(username):
+    conn = psycopg2.connect(
+        host=postgres_host,
+        database=postgres_db,
+        user=postgres_user,
+        password=postgress_pass
+    )
 
+    cur = conn.cursor()
+
+    try:
+        cur.execute(f"SELECT * from users where username='{username}'")
+        if cur.fetchone() == None:
+            return False, None
+    except psycopg2.errors.DatabaseError as e:
+        cur.close()
+        conn.rollback()
+        logging.error(f"Error at database: {e}")
+        return None, e
+
+    cur.close()
+    return True, None  
+
+def add_to_db(db_string):
     conn = psycopg2.connect(
         host=postgres_host,
         database=postgres_db,
@@ -80,8 +104,11 @@ def signup():
             #Add user in firebase
             user = auth.create_user(
                 email=email,
-                password=password
+                password=password,
+                display_name=username
             )
+            
+            logging.log(logging.INFO, f"username={username}")
 
             #Get token
             try:
@@ -93,14 +120,16 @@ def signup():
             if 'token' not in auth_json:
                 return auth_json, auth_resp.status_code
 
-            token = auth_json['token']            
-            decoded = jwt.decode(token, options={"verify_signature": False}) # works in PyJWT >= v2.0
+            token = auth_json['token']
 
+            token_split = token.split('.')
+            cookieVal = token_split[1]
+            
             #Set cookie
             resp = make_response({})
-            resp.set_cookie('ChatUserAuth', decoded['user_id'])
+            resp.set_cookie('ChatUserAuth', cookieVal)
 
-            e = add_to_db(f"INSERT INTO users (id, username, cookie) VALUES (gen_random_uuid(), '{email}', '{decoded['user_id']}');")
+            e = add_to_db(f"INSERT INTO users (id, username, cookie) VALUES (gen_random_uuid(), '{username}', '{cookieVal}');")
             
             if e != None:
                 return {'message': f'Error creating user: {str(e)}'}, 400
@@ -144,16 +173,26 @@ def login():
         return auth_json, auth_resp.status_code
 
     token = auth_json['token']
-    decoded = jwt.decode(token, options={"verify_signature": False}) # works in PyJWT >= v2.0
-
+    token_split = token.split('.')
+    cookieVal = token_split[1]
+    
+    username = auth.get_user_by_email(email=email).display_name
+    
     #set cookie
     resp = make_response({})
-    resp.set_cookie('ChatUserAuth', decoded['user_id'])
-
-    e = add_to_db(f"UPDATE users set cookie = '{decoded['user_id']}' WHERE username = '{email}';")
+    resp.set_cookie('ChatUserAuth', cookieVal)
     
+    exists, e = check_db(username)
     if e != None:
         return {'message': f'Error creating user: {str(e)}'}, 400
+    if exists:
+        e = add_to_db(f"UPDATE users set cookie = '{cookieVal}' WHERE username = '{username}';")
+        if e != None:
+            return {'message': f'Error creating user: {str(e)}'}, 400
+    else:
+        e = add_to_db(f"INSERT INTO users (id, username, cookie) VALUES (gen_random_uuid(), '{username}', '{cookieVal}');")
+        if e != None:
+            return {'message': f'Error creating user: {str(e)}'}, 400
 
     return resp
 
