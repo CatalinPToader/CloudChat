@@ -40,6 +40,9 @@ EOF
 docker build -t localhost:${reg_port}/cloudchat-backend:latest -f backend-go/backend_dockerfile ./backend-go/
 docker push localhost:${reg_port}/cloudchat-backend:latest
 
+docker build -t localhost:${reg_port}/auth:latest -f auth/Dockerfile ./auth/
+docker push localhost:${reg_port}/auth:latest
+
 terraform init
 terraform apply -auto-approve
 

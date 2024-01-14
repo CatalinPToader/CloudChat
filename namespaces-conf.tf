@@ -21,3 +21,9 @@ resource "kubernetes_namespace" "portainer_namespace" {
     name = "portainer-namespace"
   }
 }
+
+resource "kubernetes_namespace" "auth_namespace" {
+  metadata {
+    name = "auth-namespace"
+  }
+}
