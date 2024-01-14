@@ -37,14 +37,14 @@ Toate aspectele legate de implementare sunt gestionate printr-un script numit bu
 
 **_Note:_** Este posibil sa fie necesara rularea scripturilor cu **sudo**
 
-Din folderul radacina al proiectului se executa comenzile:
+Din folderul radacina al proiectului se executa comanda:
 ```bash
   ./build-infra.sh
 ```
 
 ## Oprire deployment si eliberare resurse
 
-Din folderul radacina al proiectului se executa comenzile:
+Din folderul radacina al proiectului se executa comanda:
 ```bash
   ./destroy-infra.sh
 ```
