@@ -45,3 +45,4 @@ uritemplate
 Werkzeug
 zipp
 psycopg2
+PyJWT
